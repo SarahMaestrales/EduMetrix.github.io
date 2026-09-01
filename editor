@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Manuscript — live HTML + LaTeX preview</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<style>
+  :root{
+    --ink-900:#232733;
+    --ink-700:#3b4152;
+    --ink-500:#6b7180;
+    --editor-bg:#1c1f29;
+    --editor-bg-soft:#242836;
+    --editor-text:#dfe2ea;
+    --editor-line:#333a4d;
+    --paper:#f7f4ec;
+    --paper-edge:#e8e2d2;
+    --accent:#a8643a;
+    --accent-soft:#c98a5e;
+    --ok:#5f8f6e;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+    background:var(--ink-900);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 20px;
+    background:var(--ink-900);
+    border-bottom:1px solid var(--editor-line);
+    flex-shrink:0;
+  }
+  .brand{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .brand .mark{
+    font-family: Georgia, "Iowan Old Style", serif;
+    font-style:italic;
+    font-size:19px;
+    color:var(--accent-soft);
+    letter-spacing:0.2px;
+  }
+  .brand .sub{
+    font-size:12.5px;
+    color:var(--ink-500);
+  }
+  .status{
+    font-size:12px;
+    color:var(--ink-500);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .dot{
+    width:6px;height:6px;border-radius:50%;
+    background:var(--ok);
+    transition:background .15s ease;
+  }
+  .dot.busy{ background: var(--accent-soft); }
+
+  main{
+    flex:1;
+    display:flex;
+    min-height:0;
+  }
+
+  .pane{
+    height:100%;
+    overflow:auto;
+    position:relative;
+  }
+
+  .editor-pane{
+    background:var(--editor-bg);
+    display:flex;
+    flex-direction:column;
+  }
+  .pane-label{
+    font-size:11px;
+    letter-spacing:0.04em;
+    color:var(--ink-500);
+    padding:10px 18px 8px;
+    flex-shrink:0;
+    border-bottom:1px solid var(--editor-line);
+    background:var(--editor-bg-soft);
+  }
+  textarea{
+    flex:1;
+    width:100%;
+    resize:none;
+    border:none;
+    outline:none;
+    background:var(--editor-bg);
+    color:var(--editor-text);
+    font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size:14px;
+    line-height:1.65;
+    padding:16px 18px 60px;
+    tab-size:2;
+  }
+  textarea::selection{ background:#3a4a63; }
+
+  .divider{
+    width:6px;
+    flex-shrink:0;
+    background:var(--ink-900);
+    cursor:col-resize;
+    position:relative;
+  }
+  .divider::after{
+    content:"";
+    position:absolute;
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    width:2px; height:28px;
+    background:var(--editor-line);
+    border-radius:2px;
+  }
+  .divider:hover::after, .divider.dragging::after{
+    background:var(--accent-soft);
+  }
+
+  .preview-pane{
+    background:var(--paper);
+    border-left:1px solid var(--paper-edge);
+  }
+  .preview-pane .pane-label{
+    background:var(--paper);
+    color:var(--ink-500);
+    border-bottom:1px solid var(--paper-edge);
+  }
+  .preview-body{
+    padding:32px 44px 80px;
+    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    font-size:17px;
+    line-height:1.7;
+    color:var(--ink-900);
+    max-width:720px;
+  }
+  .preview-body h1,.preview-body h2,.preview-body h3{
+    font-family: Georgia, "Iowan Old Style", serif;
+    color:var(--ink-900);
+    line-height:1.25;
+  }
+  .preview-body h1{ font-size:1.9em; margin:0 0 0.5em; }
+  .preview-body h2{ font-size:1.4em; margin:1.3em 0 0.5em; }
+  .preview-body h3{ font-size:1.15em; margin:1.1em 0 0.4em; }
+  .preview-body p{ margin:0 0 1em; }
+  .preview-body code{
+    font-family: "SF Mono", ui-monospace, monospace;
+    background:#eee7d6;
+    padding:0.12em 0.35em;
+    border-radius:3px;
+    font-size:0.88em;
+  }
+  .preview-body pre{
+    background:#eee7d6;
+    padding:12px 14px;
+    border-radius:6px;
+    overflow:auto;
+  }
+  .preview-body pre code{ background:none; padding:0; }
+  .preview-body blockquote{
+    margin:1em 0;
+    padding:2px 0 2px 16px;
+    border-left:3px solid var(--accent-soft);
+    color:var(--ink-700);
+  }
+  .preview-body table{ border-collapse:collapse; margin:1em 0; }
+  .preview-body th, .preview-body td{
+    border:1px solid var(--paper-edge);
+    padding:6px 10px;
+  }
+  .preview-body img{ max-width:100%; }
+  .preview-body .katex{ font-size:1.03em; }
+  .preview-error{
+    font-family: ui-monospace, monospace;
+    font-size:13px;
+    color:#a8483a;
+    background:#f5e3de;
+    border:1px solid #e3bdb3;
+    border-radius:6px;
+    padding:10px 12px;
+    margin-bottom:16px;
+  }
+
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-thumb{ background:#00000022; border-radius:6px; }
+  .editor-pane ::-webkit-scrollbar-thumb{ background:#ffffff1a; }
+
+  @media (max-width: 760px){
+    main{ flex-direction:column; }
+    .divider{ display:none; }
+    .pane{ width:100% !important; height:50%; }
+    .preview-pane{ border-left:none; border-top:1px solid var(--paper-edge); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="mark">Manuscript</span>
+    <span class="sub">HTML + LaTeX, side by side</span>
+  </div>
+  <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">up to date</span></div>
+</header>
+
+<main>
+  <section class="pane editor-pane" id="editorPane" style="width:50%;">
+    <div class="pane-label">SOURCE — write HTML here, math in $...$ or $$...$$</div>
+    <textarea id="source" spellcheck="false"></textarea>
+  </section>
+
+  <div class="divider" id="divider"></div>
+
+  <section class="pane preview-pane" id="previewPane" style="width:50%;">
+    <div class="pane-label">PREVIEW</div>
+    <div class="preview-body" id="preview"></div>
+  </section>
+</main>
+
+<script>
+const sample = `<h1>Notes on the Wave Equation</h1>
+<p>The one-dimensional wave equation describes how a disturbance
+travels along a string of tension $T$ and linear density $\\mu$:</p>
+
+$$
+\\frac{\\partial^2 u}{\\partial t^2} = c^2 \\frac{\\partial^2 u}{\\partial x^2}
+$$
+
+<p>where the wave speed is $c = \\sqrt{T/\\mu}$. A general solution
+takes the form of two traveling waves,</p>
+
+$$
+u(x,t) = f(x - ct) + g(x + ct).
+$$
+
+<h2>Boundary conditions</h2>
+<p>For a string of length $L$ fixed at both ends, we require
+$u(0,t) = u(L,t) = 0$, which restricts solutions to the normal modes
+$u_n(x,t) = \\sin\\!\\left(\\frac{n\\pi x}{L}\\right)\\cos(\\omega_n t)$.</p>
+
+<blockquote>Edit the HTML on the left — the preview on the right updates as you type.</blockquote>
+`;
+
+const source = document.getElementById('source');
+const preview = document.getElementById('preview');
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+
+source.value = sample;
+
+let debounceTimer = null;
+
+function renderPreview(){
+  statusDot.classList.add('busy');
+  statusText.textContent = 'rendering…';
+
+  preview.innerHTML = source.value;
+
+  try {
+    renderMathInElement(preview, {
+      delimiters: [
+        {left: "$$", right: "$$", display: true},
+        {left: "\\[", right: "\\]", display: true},
+        {left: "$", right: "$", display: false},
+        {left: "\\(", right: "\\)", display: false}
+      ],
+      throwOnError: false
+    });
+    statusDot.classList.remove('busy');
+    statusText.textContent = 'up to date';
+  } catch (err) {
+    statusDot.classList.remove('busy');
+    statusText.textContent = 'render error';
+    const errBox = document.createElement('div');
+    errBox.className = 'preview-error';
+    errBox.textContent = 'Render error: ' + err.message;
+    preview.prepend(errBox);
+  }
+}
+
+source.addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  statusText.textContent = 'editing…';
+  debounceTimer = setTimeout(renderPreview, 250);
+});
+
+renderPreview();
+
+// Resizable divider
+const divider = document.getElementById('divider');
+const editorPane = document.getElementById('editorPane');
+const previewPane = document.getElementById('previewPane');
+let dragging = false;
+
+divider.addEventListener('mousedown', () => {
+  dragging = true;
+  divider.classList.add('dragging');
+  document.body.style.userSelect = 'none';
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const main = document.querySelector('main');
+  const rect = main.getBoundingClientRect();
+  let pct = ((e.clientX - rect.left) / rect.width) * 100;
+  pct = Math.min(80, Math.max(20, pct));
+  editorPane.style.width = pct + '%';
+  previewPane.style.width = (100 - pct) + '%';
+});
+
+window.addEventListener('mouseup', () => {
+  if (!dragging) return;
+  dragging = false;
+  divider.classList.remove('dragging');
+  document.body.style.userSelect = '';
+});
+</script>
+
+</body>
+</html>
